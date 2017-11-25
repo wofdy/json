@@ -6920,6 +6920,64 @@ class json_pointer
     explicit json_pointer(const std::string& s = "") : reference_tokens(split(s)) {}
 
     /*!
+    @brief add a reference token to the JSON pointer
+
+    Adds a reference token to the JSON pointer.
+
+    @param[in] reference_token  reference token to add to the JSON pointer
+
+    @liveexample{The example shows how reference tokens can be added to JSON
+    pointers with `push_back`.,json_pointer__push_back}
+
+    @sa @ref pop_back() - remove and return last reference token
+
+    @complexity Amortized constant.
+
+    @exceptionsafety Strong guarantee: if an exception is thrown, there are no
+    changes to any JSON pointer.
+
+    @since version 3.0.0
+    */
+    void push_back(const std::string& reference_token)
+    {
+        reference_tokens.push_back(reference_token);
+    }
+
+    /*!
+    @brief remove and return last reference token
+
+    Removes and returns the last reference token from the JSON pointer. If it
+    does not exist, an exception is thrown.
+
+    @return the reference token that was removed
+
+    @throw out_of_range.405 if JSON pointer has no parent
+
+    @liveexample{The example shows how reference tokens can be removed from JSON
+    pointers with `pop_back`.,json_pointer__pop_back}
+
+    @sa @ref push_back(const std::string&) - add a reference token
+
+    @complexity Constant.
+
+    @exceptionsafety Strong guarantee: if an exception is thrown, there are no
+    changes to any JSON pointer.
+
+    @since version 2.0.0; public since version 3.0.0
+    */
+    std::string pop_back()
+    {
+        if (JSON_UNLIKELY(is_root()))
+        {
+            JSON_THROW(detail::out_of_range::create(405, "JSON pointer has no parent"));
+        }
+
+        auto last = reference_tokens.back();
+        reference_tokens.pop_back();
+        return last;
+    }
+
+    /*!
     @brief return a string representation of the JSON pointer
 
     @invariant For each JSON pointer `ptr`, it holds:
@@ -6951,22 +7009,6 @@ class json_pointer
     }
 
   private:
-    /*!
-    @brief remove and return last reference pointer
-    @throw out_of_range.405 if JSON pointer has no parent
-    */
-    std::string pop_back()
-    {
-        if (JSON_UNLIKELY(is_root()))
-        {
-            JSON_THROW(detail::out_of_range::create(405, "JSON pointer has no parent"));
-        }
-
-        auto last = reference_tokens.back();
-        reference_tokens.pop_back();
-        return last;
-    }
-
     /// return whether pointer points to the root document
     bool is_root() const
     {

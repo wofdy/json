@@ -449,4 +449,45 @@ TEST_CASE("JSON pointers")
             CHECK(j.is_object());
         }
     }
+
+    SECTION("manipulation")
+    {
+        SECTION("push_back")
+        {
+            json::json_pointer ptr;
+            CHECK(ptr.to_string() == "");
+            ptr.push_back("foo");
+            CHECK(ptr.to_string() == "/foo");
+            ptr.push_back("bar");
+            CHECK(ptr.to_string() == "/foo/bar");
+            ptr.push_back("baz");
+            CHECK(ptr.to_string() == "/foo/bar/baz");
+            ptr.push_back("1");
+            CHECK(ptr.to_string() == "/foo/bar/baz/1");
+            ptr.push_back("42");
+            CHECK(ptr.to_string() == "/foo/bar/baz/1/42");
+            ptr.push_back("something");
+            CHECK(ptr.to_string() == "/foo/bar/baz/1/42/something");
+        }
+
+        SECTION("pop_back")
+        {
+            json::json_pointer ptr("/foo/bar/baz/1/42/something");
+            CHECK(ptr.to_string() == "/foo/bar/baz/1/42/something");
+            CHECK(ptr.pop_back() == "something");
+            CHECK(ptr.to_string() == "/foo/bar/baz/1/42");
+            CHECK(ptr.pop_back() == "42");
+            CHECK(ptr.to_string() == "/foo/bar/baz/1");
+            CHECK(ptr.pop_back() == "1");
+            CHECK(ptr.to_string() == "/foo/bar/baz");
+            CHECK(ptr.pop_back() == "baz");
+            CHECK(ptr.to_string() == "/foo/bar");
+            CHECK(ptr.pop_back() == "bar");
+            CHECK(ptr.to_string() == "/foo");
+            CHECK(ptr.pop_back() == "foo");
+            CHECK(ptr.to_string() == "");
+            CHECK_THROWS_AS(ptr.pop_back(), json::out_of_range);
+            CHECK_THROWS_WITH(ptr.pop_back(), "[json.exception.out_of_range.405] JSON pointer has no parent");
+        }
+    }
 }

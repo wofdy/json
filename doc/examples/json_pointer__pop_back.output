@@ -1,0 +1,8 @@
+/foo/bar/baz/1/42/something
+something -> /foo/bar/baz/1/42
+42 -> /foo/bar/baz/1
+1 -> /foo/bar/baz
+baz -> /foo/bar
+bar -> /foo
+foo -> 
+[json.exception.out_of_range.405] JSON pointer has no parent
