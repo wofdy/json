@@ -1128,11 +1128,8 @@ scan_number_done:
         return value_float;
     }
 
-    /// return current string value (implicitly resets the token; useful only once)
-    std::string move_string()
-    {
-        return std::move(yytext);
-    }
+    /// buffer for variable-length tokens (numbers, strings)
+    std::string yytext {};
 
     /////////////////////
     // diagnostics
@@ -1257,9 +1254,6 @@ scan_number_done:
 
     /// raw input token string (for error messages)
     std::vector<char> token_string {};
-
-    /// buffer for variable-length tokens (numbers, strings)
-    std::string yytext {};
 
     /// a description of occurred lexer errors
     const char* error_message = "";

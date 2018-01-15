@@ -1427,6 +1427,8 @@ class basic_json
     using parser_callback_t = typename parser::parser_callback_t;
 
 
+    using SAX = typename parser::SAX;
+
     //////////////////
     // constructors //
     //////////////////
@@ -6237,6 +6239,18 @@ class basic_json
     static bool accept(detail::input_adapter& i)
     {
         return parser(i).accept(true);
+    }
+
+    static void sax_parse(detail::input_adapter i, SAX* sax)
+    {
+        assert(sax);
+        parser(i, nullptr, false, sax).sax_parse();
+    }
+
+    static void sax_parse(detail::input_adapter& i, SAX* sax)
+    {
+        assert(sax);
+        parser(i, nullptr, false, sax).sax_parse();
     }
 
     /*!
