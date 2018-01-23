@@ -8,6 +8,7 @@ SRCS = develop/json.hpp \
        develop/detail/exceptions.hpp \
        develop/detail/value_t.hpp \
        develop/detail/conversions/from_json.hpp \
+       develop/detail/conversions/to_chars.hpp \
        develop/detail/conversions/to_json.hpp \
        develop/detail/parsing/input_adapters.hpp \
        develop/detail/parsing/lexer.hpp \
@@ -103,7 +104,7 @@ doctest:
 # -Wno-keyword-macro: unit-tests use "#define private public"
 # -Wno-deprecated-declarations: the library deprecated some functions
 # -Wno-weak-vtables: exception class is defined inline, but has virtual method
-# -Wno-range-loop-analysis: iterator_wrapper tests "for(const auto i...)"
+# -Wno-range-loop-analysis: items tests "for(const auto i...)"
 # -Wno-float-equal: not all comparisons in the tests can be replaced by Approx
 # -Wno-switch-enum -Wno-covered-switch-default: pedantic/contradicting warnings about switches
 # -Wno-padded: padding is nothing to warn about

@@ -1301,7 +1301,7 @@ class basic_json
             array = create<array_t>(std::move(value));
         }
 
-        void destroy(value_t t)
+        void destroy(value_t t) noexcept
         {
             switch (t)
             {
@@ -1346,7 +1346,7 @@ class basic_json
     value is changed, because the invariant expresses a relationship between
     @a m_type and @a m_value.
     */
-    void assert_invariant() const
+    void assert_invariant() const noexcept
     {
         assert(m_type != value_t::object or m_value.object != nullptr);
         assert(m_type != value_t::array or m_value.array != nullptr);
@@ -1553,15 +1553,13 @@ class basic_json
 
     @since version 2.1.0
     */
-    template<typename CompatibleType, typename U = detail::uncvref_t<CompatibleType>,
-             detail::enable_if_t<not std::is_base_of<std::istream, U>::value and
-                                 not std::is_same<U, basic_json_t>::value and
-                                 not detail::is_basic_json_nested_type<
-                                     basic_json_t, U>::value and
-                                 detail::has_to_json<basic_json, U>::value,
-                                 int> = 0>
-    basic_json(CompatibleType && val) noexcept(noexcept(JSONSerializer<U>::to_json(
-                std::declval<basic_json_t&>(), std::forward<CompatibleType>(val))))
+    template <typename CompatibleType,
+              typename U = detail::uncvref_t<CompatibleType>,
+              detail::enable_if_t<
+                  detail::is_compatible_type<basic_json_t, U>::value, int> = 0>
+    basic_json(CompatibleType && val) noexcept(noexcept(
+                JSONSerializer<U>::to_json(std::declval<basic_json_t&>(),
+                                           std::forward<CompatibleType>(val))))
     {
         JSONSerializer<U>::to_json(*this, std::forward<CompatibleType>(val));
         assert_invariant();
@@ -2142,7 +2140,7 @@ class basic_json
 
     @since version 1.0.0
     */
-    ~basic_json()
+    ~basic_json() noexcept
     {
         assert_invariant();
         m_value.destroy(m_type);
@@ -4482,18 +4480,24 @@ class basic_json
 
     @note The name of this function is not yet final and may change in the
     future.
+
+    @deprecated This stream operator is deprecated and will be removed in
+                future 4.0.0 of the library. Please use @ref items() instead;
+                that is, replace `json::iterator_wrapper(j)` with `j.items()`.
     */
-    static iteration_proxy<iterator> iterator_wrapper(reference ref)
+    JSON_DEPRECATED
+    static iteration_proxy<iterator> iterator_wrapper(reference ref) noexcept
     {
-        return iteration_proxy<iterator>(ref);
+        return ref.items();
     }
 
     /*!
     @copydoc iterator_wrapper(reference)
     */
-    static iteration_proxy<const_iterator> iterator_wrapper(const_reference ref)
+    JSON_DEPRECATED
+    static iteration_proxy<const_iterator> iterator_wrapper(const_reference ref) noexcept
     {
-        return iteration_proxy<const_iterator>(ref);
+        return ref.items();
     }
 
     /*!
@@ -4533,7 +4537,8 @@ class basic_json
     @endcode
 
     @note When iterating over an array, `key()` will return the index of the
-          element as string (see example).
+          element as string (see example). For primitive types (e.g., numbers),
+          `key()` returns an empty string.
 
     @return iteration proxy object wrapping @a ref with an interface to use in
             range-based for loops
@@ -4544,8 +4549,10 @@ class basic_json
     changes in the JSON value.
 
     @complexity Constant.
+
+    @since version 3.x.x.
     */
-    iteration_proxy<iterator> items()
+    iteration_proxy<iterator> items() noexcept
     {
         return iteration_proxy<iterator>(*this);
     }
@@ -4553,7 +4560,7 @@ class basic_json
     /*!
     @copydoc items()
     */
-    iteration_proxy<const_iterator> items() const
+    iteration_proxy<const_iterator> items() const noexcept
     {
         return iteration_proxy<const_iterator>(*this);
     }
@@ -6126,8 +6133,8 @@ class basic_json
 
     /*!
     @brief serialize to stream
-    @deprecated This stream operator is deprecated and will be removed in a
-                future version of the library. Please use
+    @deprecated This stream operator is deprecated and will be removed in
+                future 4.0.0 of the library. Please use
                 @ref operator<<(std::ostream&, const basic_json&)
                 instead; that is, replace calls like `j >> o;` with `o << j;`.
     @since version 1.0.0; deprecated since version 3.0.0
@@ -6324,8 +6331,8 @@ class basic_json
 
     /*!
     @brief deserialize from stream
-    @deprecated This stream operator is deprecated and will be removed in a
-                future version of the library. Please use
+    @deprecated This stream operator is deprecated and will be removed in
+                version 4.0.0 of the library. Please use
                 @ref operator>>(std::istream&, basic_json&)
                 instead; that is, replace calls like `j << i;` with `i >> j;`.
     @since version 1.0.0; deprecated since version 3.0.0
@@ -6526,9 +6533,11 @@ class basic_json
     vector in CBOR format.,to_cbor}
 
     @sa http://cbor.io
-    @sa @ref from_cbor(const std::vector<uint8_t>&, const size_t) for the
+    @sa @ref from_cbor(detail::input_adapter, const bool strict) for the
         analogous deserialization
     @sa @ref to_msgpack(const basic_json&) for the related MessagePack format
+    @sa @ref to_ubjson(const basic_json&, const bool, const bool) for the
+             related UBJSON format
 
     @since version 2.0.9
     */
@@ -6624,6 +6633,8 @@ class basic_json
     @sa @ref from_msgpack(const std::vector<uint8_t>&, const size_t) for the
         analogous deserialization
     @sa @ref to_cbor(const basic_json& for the related CBOR format
+    @sa @ref to_ubjson(const basic_json&, const bool, const bool) for the
+             related UBJSON format
 
     @since version 2.0.9
     */
@@ -6642,6 +6653,107 @@ class basic_json
     static void to_msgpack(const basic_json& j, detail::output_adapter<char> o)
     {
         binary_writer<char>(o).write_msgpack(j);
+    }
+
+    /*!
+    @brief create a UBJSON serialization of a given JSON value
+
+    Serializes a given JSON value @a j to a byte vector using the UBJSON
+    (Universal Binary JSON) serialization format. UBJSON aims to be more compact
+    than JSON itself, yet more efficient to parse.
+
+    The library uses the following mapping from JSON values types to
+    UBJSON types according to the UBJSON specification:
+
+    JSON value type | value/range                       | UBJSON type | marker
+    --------------- | --------------------------------- | ----------- | ------
+    null            | `null`                            | null        | `Z`
+    boolean         | `true`                            | true        | `T`
+    boolean         | `false`                           | false       | `F`
+    number_integer  | -9223372036854775808..-2147483649 | int64       | `L`
+    number_integer  | -2147483648..-32769               | int32       | `l`
+    number_integer  | -32768..-129                      | int16       | `I`
+    number_integer  | -128..127                         | int8        | `i`
+    number_integer  | 128..255                          | uint8       | `U`
+    number_integer  | 256..32767                        | int16       | `I`
+    number_integer  | 32768..2147483647                 | int32       | `l`
+    number_integer  | 2147483648..9223372036854775807   | int64       | `L`
+    number_unsigned | 0..127                            | int8        | `i`
+    number_unsigned | 128..255                          | uint8       | `U`
+    number_unsigned | 256..32767                        | int16       | `I`
+    number_unsigned | 32768..2147483647                 | int32       | `l`
+    number_unsigned | 2147483648..9223372036854775807   | int64       | `L`
+    number_float    | *any value*                       | float64     | `D`
+    string          | *with shortest length indicator*  | string      | `S`
+    array           | *see notes on optimized format*   | array       | `[`
+    object          | *see notes on optimized format*   | map         | `{`
+
+    @note The mapping is **complete** in the sense that any JSON value type
+          can be converted to a UBJSON value.
+
+    @note The following values can **not** be converted to a UBJSON value:
+          - strings with more than 9223372036854775807 bytes (theoretical)
+          - unsigned integer numbers above 9223372036854775807
+
+    @note The following markers are not used in the conversion:
+          - `Z`: no-op values are not created.
+          - `C`: single-byte strings are serialized with `S` markers.
+
+    @note Any UBJSON output created @ref to_ubjson can be successfully parsed
+          by @ref from_ubjson.
+
+    @note If NaN or Infinity are stored inside a JSON number, they are
+          serialized properly. This behavior differs from the @ref dump()
+          function which serializes NaN or Infinity to `null`.
+
+    @note The optimized formats for containers are supported: Parameter
+          @a use_size adds size information to the beginning of a container and
+          removes the closing marker. Parameter @a use_type further checks
+          whether all elements of a container have the same type and adds the
+          type marker to the beginning of the container. The @a use_type
+          parameter must only be used together with @a use_size = true. Note
+          that @a use_size = true alone may result in larger representations -
+          the benefit of this parameter is that the receiving side is
+          immediately informed on the number of elements of the container.
+
+    @param[in] j  JSON value to serialize
+    @param[in] use_size  whether to add size annotations to container types
+    @param[in] use_type  whether to add type annotations to container types
+                         (must be combined with @a use_size = true)
+    @return UBJSON serialization as byte vector
+
+    @complexity Linear in the size of the JSON value @a j.
+
+    @liveexample{The example shows the serialization of a JSON value to a byte
+    vector in UBJSON format.,to_ubjson}
+
+    @sa http://ubjson.org
+    @sa @ref from_ubjson(detail::input_adapter, const bool strict) for the
+        analogous deserialization
+    @sa @ref to_cbor(const basic_json& for the related CBOR format
+    @sa @ref to_msgpack(const basic_json&) for the related MessagePack format
+
+    @since version 3.1.0
+    */
+    static std::vector<uint8_t> to_ubjson(const basic_json& j,
+                                          const bool use_size = false,
+                                          const bool use_type = false)
+    {
+        std::vector<uint8_t> result;
+        to_ubjson(j, result, use_size, use_type);
+        return result;
+    }
+
+    static void to_ubjson(const basic_json& j, detail::output_adapter<uint8_t> o,
+                          const bool use_size = false, const bool use_type = false)
+    {
+        binary_writer<uint8_t>(o).write_ubjson(j, use_size, use_type);
+    }
+
+    static void to_ubjson(const basic_json& j, detail::output_adapter<char> o,
+                          const bool use_size = false, const bool use_type = false)
+    {
+        binary_writer<char>(o).write_ubjson(j, use_size, use_type);
     }
 
     /*!
@@ -6730,6 +6842,8 @@ class basic_json
     @sa @ref to_cbor(const basic_json&) for the analogous serialization
     @sa @ref from_msgpack(detail::input_adapter, const bool) for the
         related MessagePack format
+    @sa @ref from_ubjson(detail::input_adapter, const bool) for the related
+        UBJSON format
 
     @since version 2.0.9; parameter @a start_index since 2.1.1; changed to
            consume input adapters, removed start_index parameter, and added
@@ -6817,6 +6931,8 @@ class basic_json
     @sa @ref to_msgpack(const basic_json&) for the analogous serialization
     @sa @ref from_cbor(detail::input_adapter, const bool) for the related CBOR
         format
+    @sa @ref from_ubjson(detail::input_adapter, const bool) for the related
+        UBJSON format
 
     @since version 2.0.9; parameter @a start_index since 2.1.1; changed to
            consume input adapters, removed start_index parameter, and added
@@ -6836,6 +6952,72 @@ class basic_json
     static basic_json from_msgpack(A1 && a1, A2 && a2, const bool strict = true)
     {
         return binary_reader(detail::input_adapter(std::forward<A1>(a1), std::forward<A2>(a2))).parse_msgpack(strict);
+    }
+
+    /*!
+    @brief create a JSON value from an input in UBJSON format
+
+    Deserializes a given input @a i to a JSON value using the UBJSON (Universal
+    Binary JSON) serialization format.
+
+    The library maps UBJSON types to JSON value types as follows:
+
+    UBJSON type | JSON value type                         | marker
+    ----------- | --------------------------------------- | ------
+    no-op       | *no value, next value is read*          | `N`
+    null        | `null`                                  | `Z`
+    false       | `false`                                 | `F`
+    true        | `true`                                  | `T`
+    float32     | number_float                            | `d`
+    float64     | number_float                            | `D`
+    uint8       | number_unsigned                         | `U`
+    int8        | number_integer                          | `i`
+    int16       | number_integer                          | `I`
+    int32       | number_integer                          | `l`
+    int64       | number_integer                          | `L`
+    string      | string                                  | `S`
+    char        | string                                  | `C`
+    array       | array (optimized values are supported)  | `[`
+    object      | object (optimized values are supported) | `{`
+
+    @note The mapping is **complete** in the sense that any UBJSON value can
+          be converted to a JSON value.
+
+    @param[in] i  an input in UBJSON format convertible to an input adapter
+    @param[in] strict  whether to expect the input to be consumed until EOF
+                       (true by default)
+
+    @throw parse_error.110 if the given input ends prematurely or the end of
+    file was not reached when @a strict was set to true
+    @throw parse_error.112 if a parse error occurs
+    @throw parse_error.113 if a string could not be parsed successfully
+
+    @complexity Linear in the size of the input @a i.
+
+    @liveexample{The example shows the deserialization of a byte vector in
+    UBJSON format to a JSON value.,from_ubjson}
+
+    @sa http://ubjson.org
+    @sa @ref to_ubjson(const basic_json&, const bool, const bool) for the
+             analogous serialization
+    @sa @ref from_cbor(detail::input_adapter, const bool) for the related CBOR
+        format
+    @sa @ref from_msgpack(detail::input_adapter, const bool) for the related
+        MessagePack format
+
+    @since version 3.1.0
+    */
+    static basic_json from_ubjson(detail::input_adapter i,
+                                  const bool strict = true)
+    {
+        return binary_reader(i).parse_ubjson(strict);
+    }
+
+    template<typename A1, typename A2,
+             detail::enable_if_t<std::is_constructible<detail::input_adapter, A1, A2>::value, int> = 0>
+    static basic_json from_ubjson(A1 && a1, A2 && a2, const bool strict = true)
+    {
+        return binary_reader(detail::input_adapter(std::forward<A1>(a1), std::forward<A2>(a2))).parse_ubjson(strict);
     }
 
     /// @}
@@ -7261,7 +7443,7 @@ class basic_json
             // wrapper to get a value for an operation
             const auto get_value = [&val](const std::string & op,
                                           const std::string & member,
-                                          bool string_type) -> basic_json&
+                                          bool string_type) -> basic_json &
             {
                 // find value
                 auto it = val.m_value.object->find(member);
@@ -7411,6 +7593,7 @@ class basic_json
     diff for two JSON values.,diff}
 
     @sa @ref patch -- apply a JSON patch
+    @sa @ref merge_patch -- apply a JSON Merge Patch
 
     @sa [RFC 6902 (JSON Patch)](https://tools.ietf.org/html/rfc6902)
 
@@ -7539,6 +7722,83 @@ class basic_json
         }
 
         return result;
+    }
+
+    /// @}
+
+    ////////////////////////////////
+    // JSON Merge Patch functions //
+    ////////////////////////////////
+
+    /// @name JSON Merge Patch functions
+    /// @{
+
+    /*!
+    @brief applies a JSON Merge Patch
+
+    The merge patch format is primarily intended for use with the HTTP PATCH
+    method as a means of describing a set of modifications to a target
+    resource's content. This function applies a merge patch to the current
+    JSON value.
+
+    The function implements the following algorithm from Section 2 of
+    [RFC 7396 (JSON Merge Patch)](https://tools.ietf.org/html/rfc7396):
+
+    ```
+    define MergePatch(Target, Patch):
+      if Patch is an Object:
+        if Target is not an Object:
+          Target = {} // Ignore the contents and set it to an empty Object
+        for each Name/Value pair in Patch:
+          if Value is null:
+            if Name exists in Target:
+              remove the Name/Value pair from Target
+          else:
+            Target[Name] = MergePatch(Target[Name], Value)
+        return Target
+      else:
+        return Patch
+    ```
+
+    Thereby, `Target` is the current object; that is, the patch is applied to
+    the current value.
+
+    @param[in] patch  the patch to apply
+
+    @complexity Linear in the lengths of @a patch.
+
+    @liveexample{The following code shows how a JSON Merge Patch is applied to
+    a JSON document.,merge_patch}
+
+    @sa @ref patch -- apply a JSON patch
+    @sa [RFC 7396 (JSON Merge Patch)](https://tools.ietf.org/html/rfc7396)
+
+    @since version 3.0.0
+    */
+    void merge_patch(const basic_json& patch)
+    {
+        if (patch.is_object())
+        {
+            if (not is_object())
+            {
+                *this = object();
+            }
+            for (auto it = patch.begin(); it != patch.end(); ++it)
+            {
+                if (it.value().is_null())
+                {
+                    erase(it.key());
+                }
+                else
+                {
+                    operator[](it.key()).merge_patch(it.value());
+                }
+            }
+        }
+        else
+        {
+            *this = patch;
+        }
     }
 
     /// @}

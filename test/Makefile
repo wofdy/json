@@ -25,9 +25,10 @@ SOURCES = src/unit.cpp \
           src/unit-element_access1.cpp \
           src/unit-element_access2.cpp \
           src/unit-inspection.cpp \
-          src/unit-iterator_wrapper.cpp \
+          src/unit-items.cpp \
           src/unit-iterators1.cpp \
           src/unit-iterators2.cpp \
+          src/unit-merge_patch.cpp \
           src/unit-json_patch.cpp \
           src/unit-json_pointer.cpp \
           src/unit-meta.cpp \
@@ -39,6 +40,7 @@ SOURCES = src/unit.cpp \
           src/unit-regression.cpp \
           src/unit-serialization.cpp \
           src/unit-testsuites.cpp \
+          src/unit-ubjson.cpp \
           src/unit-unicode.cpp
 
 OBJECTS = $(SOURCES:.cpp=.o)

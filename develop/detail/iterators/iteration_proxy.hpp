@@ -9,7 +9,7 @@ namespace nlohmann
 {
 namespace detail
 {
-/// proxy class for the iterator_wrapper functions
+/// proxy class for the items() function
 template<typename IteratorType> class iteration_proxy
 {
   private:
@@ -79,7 +79,7 @@ template<typename IteratorType> class iteration_proxy
 
   public:
     /// construct iteration proxy from a container
-    explicit iteration_proxy(typename IteratorType::reference cont)
+    explicit iteration_proxy(typename IteratorType::reference cont) noexcept
         : container(cont) {}
 
     /// return iterator begin (needed for range-based for)
